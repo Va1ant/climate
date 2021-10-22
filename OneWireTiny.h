@@ -1,0 +1,95 @@
+#include "Macro.h"
+
+// Perform the onewire reset function.  We will wait up to 250uS for
+// the bus to come high, if it doesn't then it is broken or shorted
+// and we return a 0;
+//
+// Returns 1 if a device asserted a presence pulse, 0 otherwise.
+//
+uint8_t ds_reset() {
+  uint8_t retries = 125;
+
+  pinAsInput(TERMO_PIN);
+  // wait until the wire is high... just in case
+  do {
+    if (--retries == 0) return 0;
+    _delay_us(2);
+  } while (!readPin(TERMO_PIN));
+
+  // - Drop line
+  pinToLOW(TERMO_PIN);
+  pinAsOutput(TERMO_PIN);
+  _delay_us(480);
+
+  // - Listen for reply pulse
+  pinAsInput(TERMO_PIN);
+  _delay_us(70);
+
+  // - Read line state
+  uint8_t state = !readPin(TERMO_PIN);
+  _delay_us(410);
+  return state;
+}
+
+//! Write single bit
+void ds_writeBit(const uint8_t Bit) {
+  if (Bit & 1) {
+    // - Drop line
+    pinToLOW(TERMO_PIN);
+    pinAsOutput(TERMO_PIN);
+    // - Write Bit-1
+    _delay_us(10);
+    pinToHIGH(TERMO_PIN);
+    _delay_us(55);
+  } else {
+    // - Drop line
+    pinToLOW(TERMO_PIN);
+    pinAsOutput(TERMO_PIN);
+    // - Write Bit-0
+    _delay_us(65);
+    pinToHIGH(TERMO_PIN);
+    _delay_us(5);
+  }
+}
+
+//! Read single bit
+uint8_t ds_readBit() {
+  // - Drop line
+  pinAsOutput(TERMO_PIN);
+  pinToLOW(TERMO_PIN);
+  _delay_us(3);
+
+  // - Wait for data
+  pinAsInput(TERMO_PIN);
+  _delay_us(10);
+
+  // - Read bit into byte
+  uint8_t Bit = readPin(TERMO_PIN);
+  _delay_us(53);
+  return Bit;
+}
+
+//! Write byte
+void ds_write(const uint8_t Byte, bool Power = 0) {
+
+  // - Write each bit
+  for (uint8_t BitMask = 0x01; BitMask; BitMask <<= 1) ds_writeBit((BitMask & Byte) ? 1 : 0);
+
+  // - Disable power
+  if (!Power) {
+    pinAsInput(TERMO_PIN);
+    pinToLOW(TERMO_PIN);
+  }
+}
+
+//! Read byte
+uint8_t ds_read() {
+  uint8_t Byte = 0;
+
+  // - Read all bits
+  for (uint8_t BitMask = 0x01; BitMask; BitMask <<= 1) {
+    // - Read & store bit into byte
+    if (ds_readBit()) Byte |= BitMask;
+  }
+  return Byte;
+}
