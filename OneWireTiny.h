@@ -1,3 +1,5 @@
+// maybe _delay_us intervals should be corrected
+
 #include "Macro.h"
 
 // Perform the onewire reset function.  We will wait up to 250uS for
@@ -92,4 +94,20 @@ uint8_t ds_read() {
     if (ds_readBit()) Byte |= BitMask;
   }
   return Byte;
+}
+
+//crc check; delete if fine work
+uint8_t ds_crc8(const uint8_t *addr, uint8_t len) {
+  uint8_t crc = 0;
+
+  while (len--) {
+    uint8_t inbyte = *addr++;
+    for (uint8_t i = 8; i; i--) {
+      uint8_t mix = (crc ^ inbyte) & 0x01;
+      crc >>= 1;
+      if (mix) crc ^= 0x8C;
+      inbyte >>= 1;
+    }
+  }
+  return crc;
 }
