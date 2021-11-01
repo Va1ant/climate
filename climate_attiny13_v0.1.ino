@@ -4,7 +4,7 @@
 #include <util/delay.h>
 #include "Macro.h"
 #include "OneWireTiny.h"
-#include "RelayTinyStruct.h"
+#include "RelayTiny.h"
 
 int main(void) {
   uint8_t data[9]; //[9] for crc; [7] if normal work; [2] for 0.5 temperature resolution
