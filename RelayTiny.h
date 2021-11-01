@@ -1,30 +1,29 @@
-class GyverRelay {
-  public:
-    int16_t setpoint = 0;   // заданная величина, которую должен поддерживать регулятор (температура)
-    int16_t hysteresis = 0; // +- от желаемой
-    int16_t k = 0;          // коэффициент усиления по скорости
-    int16_t input = 0;      // сигнал с датчика (например температура, которую мы регулируем)
-    bool output = 0;        // выход регулятора
+#include <stdint.h>
+#include <stdbool.h>
 
-    bool compute();
-  private:
-    int16_t prevInput = 0;
-    bool _direction = true;
+struct Relay {
+	int16_t setpoint;   // заданная величина, которую должен поддерживать регулятор (температура)
+	int16_t hysteresis; // +- от желаемой
+	int16_t k;          // коэффициент усиления по скорости
+	int16_t input;      // сигнал с датчика (например температура, которую мы регулируем)
+	int16_t prevInput;
+	_Bool output;       // выход регулятора
+	_Bool direction;
 };
 
 int8_t signum(const int16_t val) {
-  return ((val > 0) ? 1 : ((val < 0) ? -1 : 0));
+	return ((val > 0) ? 1 : ((val < 0) ? -1 : 0));
 }
 
-boolean GyverRelay::compute() {
-  int16_t signal;
-  int16_t rate = input - prevInput;    // производная от величины (величина/секунду)
-  prevInput = input;
-  signal = input + rate * k;
+inline _Bool compute(struct Relay *r) {
+	int16_t signal;
+	int16_t rate = r->input - r->prevInput;    // производная от величины (величина/секунду)
+	r->prevInput = r->input;
+	signal = r->input + rate * r->k;
 
-  int8_t F = (signum(signal - setpoint - hysteresis) + signum(signal - setpoint + hysteresis)) >> 1;
+	int8_t F = (signum(signal - r->setpoint - r->hysteresis) + signum(signal - r->setpoint + r->hysteresis)) >> 1;
 
-  if (F == 1) output = !_direction;
-  else if (F == -1) output = _direction;
-  return output;
+	if (F == 1) r->output = !r->direction;
+	else if (F == -1) r->output = r->direction;
+	return r->output;
 }
