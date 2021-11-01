@@ -1,5 +1,7 @@
-// maybe _delay_us intervals should be corrected
+// maybe timing should be corrected. look datasheet
 
+#include <stdint.h>
+#include <stdbool.h>
 #include "Macro.h"
 
 // Perform the onewire reset function.  We will wait up to 250uS for
@@ -8,7 +10,7 @@
 //
 // Returns 1 if a device asserted a presence pulse, 0 otherwise.
 //
-uint8_t ds_reset() {
+_Bool ds_reset() {
   uint8_t retries = 125;
 
   pinAsInput(TERMO_PIN);
@@ -28,13 +30,13 @@ uint8_t ds_reset() {
   _delay_us(70);
 
   // - Read line state
-  uint8_t state = !readPin(TERMO_PIN);
+  _Bool state = !readPin(TERMO_PIN);
   _delay_us(410);
   return state;
 }
 
 //! Write single bit
-void ds_writeBit(const uint8_t Bit) {
+void ds_writeBit(const _Bool Bit) {
   if (Bit & 1) {
     // - Drop line
     pinToLOW(TERMO_PIN);
@@ -55,7 +57,7 @@ void ds_writeBit(const uint8_t Bit) {
 }
 
 //! Read single bit
-uint8_t ds_readBit() {
+_Bool ds_readBit() {
   // - Drop line
   pinAsOutput(TERMO_PIN);
   pinToLOW(TERMO_PIN);
@@ -66,13 +68,13 @@ uint8_t ds_readBit() {
   _delay_us(10);
 
   // - Read bit into byte
-  uint8_t Bit = readPin(TERMO_PIN);
+  _Bool Bit = readPin(TERMO_PIN);
   _delay_us(53);
   return Bit;
 }
 
 //! Write byte
-void ds_write(const uint8_t Byte, bool Power = 0) {
+void ds_write(const uint8_t Byte, _Bool Power) {
 
   // - Write each bit
   for (uint8_t BitMask = 0x01; BitMask; BitMask <<= 1) ds_writeBit((BitMask & Byte) ? 1 : 0);
@@ -97,7 +99,7 @@ uint8_t ds_read() {
 }
 
 //crc check; delete if fine work
-uint8_t ds_crc8(const uint8_t *addr, uint8_t len) {
+uint8_t ds_crc(const uint8_t *addr, uint8_t len) {
   uint8_t crc = 0;
 
   while (len--) {
@@ -110,4 +112,11 @@ uint8_t ds_crc8(const uint8_t *addr, uint8_t len) {
     }
   }
   return crc;
+}
+
+_Bool ds_termo(const uint8_t cmd) {
+  if (!ds_reset()) return 0;
+  ds_write(0xCC, 0);
+  ds_write(cmd, 0);
+  return 1;
 }
