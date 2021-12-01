@@ -5,7 +5,7 @@ volatile uint8_t tim0_ovf = 0;
 struct Relay heater = {
 	.setpoint = 21 * 16,	// желаемая температура
 	.hysteresis = 1 * 16,	// +- от желаемой
-	.k = 1,					// коэффициент усиления обратной связи
+	.k = 1,			// коэффициент усиления обратной связи
 	.prevInput = 0,
 	.output = 0,
 	.direction = 1
@@ -13,7 +13,7 @@ struct Relay heater = {
 
 int main(void) {
 	uint8_t time1;
-	uint8_t data[9]; // [9] for crc; [7] if normal work; [2] for 0.5 temperature resolution
+	uint8_t data[9];	// [9] for crc; [7] if normal work; [2] for 0.5 temperature resolution
 	
 	pinAsOutput(ERROR_PIN);
 	pinAsOutput(HEATER_PIN);
@@ -27,9 +27,9 @@ int main(void) {
 	
 	// Timer0 init
 	TCCR0B |= (1 << CS02 | 1 << CS00);	// clk/1024
-	TIMSK |= (1 << TOIE0);	// TIM0 overflow interrup enable
+	TIMSK |= (1 << TOIE0);			// TIM0 overflow interrup enable
 	
-	GIMSK |= (1 << INT0);	// Int0 init
+	GIMSK |= (1 << INT0);		// Int0 init
 	//MCUCR |= (1 << ISC01);	// maybe falling edge trigger better?
 	
 	sei();
@@ -44,8 +44,8 @@ int main(void) {
 			if (ds_termo(0xBE)) {	// read command or termometer not on line
 				for (uint8_t i = 0; i < 9; i++) data[i] = ds_read(TERMO_PIN); // [9] for crc; [7] if normal work
 				
-				if (data[0] == 0xAA) DO_ERROR();	// if true, maybe problem with power on termometer
-				if (ds_crc(data, 8) != data[8]) DO_ERROR();	// check crc; delete if work fine
+				if (data[0] == 0xAA) DO_ERROR();		// if true, maybe problem with power on termometer
+				if (ds_crc(data, 8) != data[8]) DO_ERROR();	// check crc
 				
 				// calculate temperature and send it to relay regulator
 				heater.input = ((data[0] << 3 | data[1] << 11) & 0xFFF0) + 12 - data[6];
@@ -60,10 +60,10 @@ int main(void) {
 }
 
 ISR (INT0_vect) {
-	// data transfer led indicator 
+	// data transfer indicator 
 	pinToHIGH(PB1);
 	
-	// debug delay
+	// "sync" delay
 	_delay_loop_1(3);
 	
 	ds_write(heater.input >> 3, 1, PB0);
