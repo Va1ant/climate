@@ -7,11 +7,11 @@
 struct Relay {
 	volatile int16_t setpoint;	// заданная величина, которую должен поддерживать регулятор (температура)
 	int16_t hysteresis;		// +- от желаемой
-	int16_t k;				// коэффициент усиления по скорости
+	int16_t k;			// коэффициент усиления по скорости
 	int16_t input;			// сигнал с датчика (например температура, которую мы регулируем)
 	int16_t prevInput;
 	_Bool output;			// выход регулятора
-	const _Bool direction;	// направление регулятора
+	const _Bool direction;		// направление регулятора
 };
 
 inline int8_t signum(const int16_t val) {
