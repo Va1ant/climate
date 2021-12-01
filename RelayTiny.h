@@ -1,23 +1,26 @@
+#ifndef RELAYTINY_H_
+#define RELAYTINY_H_
+
 #include <stdint.h>
 #include <stdbool.h>
 
 struct Relay {
-	int16_t setpoint;   // заданная величина, которую должен поддерживать регулятор (температура)
-	int16_t hysteresis; // +- от желаемой
-	int16_t k;          // коэффициент усиления по скорости
-	int16_t input;      // сигнал с датчика (например температура, которую мы регулируем)
+	volatile int16_t setpoint;	// заданная величина, которую должен поддерживать регулятор (температура)
+	int16_t hysteresis;		// +- от желаемой
+	int16_t k;				// коэффициент усиления по скорости
+	int16_t input;			// сигнал с датчика (например температура, которую мы регулируем)
 	int16_t prevInput;
-	_Bool output;       // выход регулятора
-	_Bool direction;
+	_Bool output;			// выход регулятора
+	const _Bool direction;	// направление регулятора
 };
 
-int8_t signum(const int16_t val) {
+inline int8_t signum(const int16_t val) {
 	return ((val > 0) ? 1 : ((val < 0) ? -1 : 0));
 }
 
 inline _Bool compute(struct Relay *r) {
 	int16_t signal;
-	int16_t rate = r->input - r->prevInput;    // производная от величины (величина/секунду)
+	int16_t rate = r->input - r->prevInput;	// производная от величины (величина/время)
 	r->prevInput = r->input;
 	signal = r->input + rate * r->k;
 
@@ -27,3 +30,5 @@ inline _Bool compute(struct Relay *r) {
 	else if (F == -1) r->output = r->direction;
 	return r->output;
 }
+
+#endif
