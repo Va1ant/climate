@@ -19,7 +19,7 @@ _Bool ds_reset() {
 	// wait until the wire is high... just in case
 	do {
 		if (--retries == 0) return 0;
-		_delay_loop_1(1);
+		asm ("nop");
 	} while (!readPin(TERMO_PIN));
 
 	// - Drop line
@@ -48,7 +48,7 @@ void ds_writeBit(const _Bool Bit, const uint8_t pin) {
 		_delay_us(55);
 	} else {
 		// - Write Bit-0
-		_delay_us(60);
+		_delay_us(57);
 		pinToHIGH(pin);
 	}
 }
@@ -68,9 +68,9 @@ _Bool ds_readBit(const uint8_t pin) {
 	// - Read bit into byte
 	Bit = readPin(pin);
 	// let pin float, pull up will raise, говорили они
-	pinToHIGH(pin);
+//	pinToHIGH(pin);
 	
-	_delay_us(50);
+	_delay_us(45);
 	return Bit;
 }
 
@@ -117,10 +117,7 @@ inline uint8_t ds_crc(const uint8_t *addr, uint8_t len) {
 }
 
 inline _Bool ds_termo(const uint8_t cmd) {
-	if (!ds_reset()) {
-		DO_ERROR();
-		return 0;
-	}
+	if (!ds_reset()) return 0;
 	ds_write(0xCC, 0, TERMO_PIN);
 	ds_write(cmd, 0, TERMO_PIN);
 	return 1;

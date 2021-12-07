@@ -1,8 +1,10 @@
 #include "main.h"
 
-volatile uint8_t tim0_ovf = 0;
+volatile uint8_t seconds = 0;
+uint8_t period;
+uint8_t ERRSUM;
 
-struct Relay heater = {
+struct Relay heater = {	// default values for:
 	.setpoint = 21 * 16,	// желаемая температура
 	.hysteresis = 1 * 16,	// +- от желаемой
 	.k = 1,			// коэффициент усиления обратной связи
@@ -15,65 +17,88 @@ int main(void) {
 	uint8_t time1;
 	uint8_t data[9];	// [9] for crc; [7] if normal work; [2] for 0.5 temperature resolution
 	
-	pinAsOutput(ERROR_PIN);
+	/* Power Reduction config */
+	ACSR = (1 << ACD);	// Analog comparator disable
+	PRR = (1 << PRTIM1) | (1 << PRTIM0) | (1 << PRUSI) | (1 << PRADC);	// timer1, timer0, USI, ADC disable
+	
+	/* Pin config */
+	pinAsOutput(ERROR_PIN);	// actual error led indication
 	pinAsOutput(HEATER_PIN);
+	pinToHIGH(PB2);			// pullup INT0
+	pinToHIGH(PB0);			// pullup data line
 	
-	// INT0
-	pinAsInput(PB2);
-	pinToHIGH(PB2);
-	// data channel
-	pinAsInput(PB0);
-	pinToHIGH(PB0);
-	
-	// Timer0 init
-	TCCR0B |= (1 << CS02 | 1 << CS00);	// clk/1024
-	TIMSK |= (1 << TOIE0);			// TIM0 overflow interrup enable
-	
-	GIMSK |= (1 << INT0);		// Int0 init
-	//MCUCR |= (1 << ISC01);	// maybe falling edge trigger better?
-	
+	/* Interrupt config */
+	GIMSK = (1 << INT0);
 	sei();
 
 	for (_Bool measure = 1;;) {
 		if (measure) {
-			if (ds_termo(0x44)) {	// compute command or termometer not on line
-				time1 = tim0_ovf;
+			if(ds_termo(0x44)) {	// compute command
+				time1 = seconds;
 				measure = 0;
+				
+				/* Watchdog config */
+				//WDTCR = (1 << WDCE) | (1 << WDE);	// без этой строчки не работает симуляция в proteus
+				WDTCR = (1 << WDIE) | (1 << WDP2) | (1 << WDP1); // 1 sec
+				period = 1;
+			} else {
+				ERRSUM |= (1 << LIGR);
+				DO_ERROR();	// skip iteration
 			}
-		} else if ((uint8_t)(tim0_ovf - time1) >= 4) {	// about 1.048576 sec with 1024*256/1000000*4
-			if (ds_termo(0xBE)) {	// read command or termometer not on line
-				for (uint8_t i = 0; i < 9; i++) data[i] = ds_read(TERMO_PIN); // [9] for crc; [7] if normal work
+		} else if ((uint8_t)(seconds - time1) >= 1) {
+			measure = 1;	// measure in next iteration
+			if(ds_termo(0xBE)) {	// read scratchpad command
+				for (uint8_t i = 0; i < 9; i++) data[i] = ds_read(TERMO_PIN); // read termometer scratchpad into data[]
 				
-				if (data[0] == 0xAA) DO_ERROR();		// if true, maybe problem with power on termometer
-				if (ds_crc(data, 8) != data[8]) DO_ERROR();	// check crc
+				if (data[0] == 0xAA) {	// AA is termometer power-on reset value. If true, maybe problem with power on termometer
+					ERRSUM |= (1 << PORV);
+					DO_ERROR();
+				}
+				if (ds_crc(data, 8) != data[8]) {	// check crc
+					ERRSUM |= (1 << CRCW);
+					DO_ERROR();
+				}
+				pinToLOW(ERROR_PIN);	// no errors in this iteration
 				
+				cli();
 				// calculate temperature and send it to relay regulator
 				heater.input = ((data[0] << 3 | data[1] << 11) & 0xFFF0) + 12 - data[6];
+				sei();
 				
-				if (compute(&heater)) pinToHIGH(HEATER_PIN);
-				else pinToLOW(HEATER_PIN);
-				
-				measure = 1;
+				if (compute(&heater, seconds)) {
+					pinToHIGH(HEATER_PIN);
+					continue;	// skip sleep instruction. will sleep after sending compute cmd
+				} else {
+					pinToLOW(HEATER_PIN);
+					
+					/* Watchdog config */
+					//WDTCR = (1 << WDCE) | (1 << WDE);	// без этой строчки не работает симуляция в proteus
+					WDTCR = (1 << WDIE) | (1 << WDP3) | (1 << WDP0); // 8 sec
+					period = 8;
+				}
+			} else {
+				ERRSUM |= (1 << LIGR);
+				DO_ERROR();	// skip iteration
 			}
-		} if (readPin(HEATER_PIN)) pinToLOW(ERROR_PIN);
-	}
+		}
+		// no errors in this iteration. Go to sleep
+		/* Sleep config */
+		MCUCR = (1 << SM1) | (1 << SE); // Power-down mode
+		asm ("sleep");
+		MCUCR &= ~(1 << SE);
+	} // for
+} // main
+
+ISR (WDT_vect) {
+	seconds += period;
 }
 
 ISR (INT0_vect) {
-	// data transfer indicator 
-	pinToHIGH(PB1);
-	
 	// "sync" delay
 	_delay_loop_1(3);
 	
+	ds_write(ERRSUM, 1, PB0);
 	ds_write(heater.input >> 3, 1, PB0);
 	ds_write(heater.setpoint >> 3, 1, PB0);
-	heater.setpoint = ds_read(PB0) << 3;
-	ds_write(heater.setpoint >> 3, 1, PB0);
-	
-	pinToLOW(PB1);
-}
-
-ISR (TIM0_OVF_vect) {
-	tim0_ovf++;
+	heater.setpoint = (ds_read(PB0) << 3);
 }
