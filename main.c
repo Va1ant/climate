@@ -24,8 +24,8 @@ int main(void) {
 	/* Pin config */
 	pinAsOutput(ERROR_PIN);	// actual error led indication
 	pinAsOutput(HEATER_PIN);
-	pinToHIGH(PB2);			// pullup INT0
-	pinToHIGH(PB0);			// pullup data line
+	pinToHIGH(PB2);		// pullup INT0
+	pinToHIGH(PB0);		// pullup data line
 	
 	/* Interrupt config */
 	GIMSK = (1 << INT0);
@@ -46,7 +46,7 @@ int main(void) {
 				DO_ERROR();	// skip iteration
 			}
 		} else if ((uint8_t)(seconds - time1) >= 1) {
-			measure = 1;	// measure in next iteration
+			measure = 1;		// measure in next iteration
 			if(ds_termo(0xBE)) {	// read scratchpad command
 				for (uint8_t i = 0; i < 9; i++) data[i] = ds_read(TERMO_PIN); // read termometer scratchpad into data[]
 				
