@@ -52,11 +52,11 @@ int main(void) {
 				
 				if (data[0] == 0xAA) {	// AA is termometer power-on reset value. If true, maybe problem with power on termometer
 					ERRSUM |= (1 << PORV);
-					DO_ERROR();
+					DO_ERROR();	// skip iteration
 				}
 				if (ds_crc(data, 8) != data[8]) {	// check crc
 					ERRSUM |= (1 << CRCW);
-					DO_ERROR();
+					DO_ERROR();	// skip iteration
 				}
 				pinToLOW(ERROR_PIN);	// no errors in this iteration
 				
