@@ -4,7 +4,7 @@ volatile uint8_t seconds = 0;
 uint8_t period;
 uint8_t ERRSUM;
 
-struct Relay heater = {	// default values for:
+struct Relay heater = {		// default values for:
 	.setpoint = 21 * 16,	// желаемая температура
 	.hysteresis = 1 * 16,	// +- от желаемой
 	.k = 1,			// коэффициент усиления обратной связи
