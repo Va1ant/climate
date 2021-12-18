@@ -18,7 +18,7 @@
 #define ACTU 5	// Actual error
 
 // scratchpad length
-#define FULL		9
+#define FULL	9
 #define HIRES	7
 #define LOWRES	2
 #define NOSIGN	1
@@ -27,7 +27,7 @@
 // scratchpad fields
 #define TEMPERATURE	0
 #define SIGN		1
-#define REMAIN	6
+#define REMAIN		6
 #define CRC_VALUE	8
 
 // saves the resolution of temperature and still operates with an integer

@@ -6,7 +6,7 @@
 #ifndef ONEWIRETINY_H_
 #define ONEWIRETINY_H_
 
-#define MEASURE	0x44
+#define MEASURE		0x44
 #define SKIP_ROM	0xCC
 #define READ_SCRATCHPAD	0xBE
 #define RESET_VALUE	0xAA

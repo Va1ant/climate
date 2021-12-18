@@ -55,7 +55,7 @@ int main(void) {
 		// Sleep config
 		MCUCR = (1 << SM1) | (1 << SE); // Power-down mode; sleep enable
 		asm ("sleep");
-		MCUCR &= ~(1 << SE);			// Sleep disable, as datasheet recomends
+		MCUCR &= ~(1 << SE);		// Sleep disable, as datasheet recomends
 	} // for
 } // main
 
