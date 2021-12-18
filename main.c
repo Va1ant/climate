@@ -1,104 +1,106 @@
 #include "main.h"
 
-volatile uint8_t seconds = 0;
-uint8_t period;
-uint8_t ERRSUM;
-
-struct Relay heater = {		// default values for:
-	.setpoint = 21 * 16,	// желаемая температура
-	.hysteresis = 1 * 16,	// +- от желаемой
-	.k = 1,			// коэффициент усиления обратной связи
-	.prevInput = 0,
-	.output = 0,
-	.direction = 1
-};
-
 int main(void) {
-	uint8_t time1;
-	uint8_t data[9];	// [9] for crc; [7] if normal work; [2] for 0.5 temperature resolution
+	uint8_t someTime;
+	uint8_t scratchpad[LENGTH];
 	
-	/* Power Reduction config */
-	ACSR = (1 << ACD);	// Analog comparator disable
-	PRR = (1 << PRTIM1) | (1 << PRTIM0) | (1 << PRUSI) | (1 << PRADC);	// timer1, timer0, USI, ADC disable
+	if (MCUSR & (1 << WDRF)) ERRSUM |= (1 << WDRF);
 	
-	/* Pin config */
-	pinAsOutput(ERROR_PIN);	// actual error led indication
-	pinAsOutput(HEATER_PIN);
-	pinToHIGH(PB2);		// pullup INT0
-	pinToHIGH(PB0);		// pullup data line
+	// Power Reduction config
+	ACSR = (1 << ACD);
+	PRR = (1 << PRTIM1) | (1 << PRTIM0) | (1 << PRUSI) | (1 << PRADC);
 	
-	/* Interrupt config */
+	// Pin config
+	DDRB = (1 << ERROR_PIN) | (1 << HEATER_PIN);
+	
+	// Interrupt config
 	GIMSK = (1 << INT0);
 	sei();
 
 	for (_Bool measure = 1;;) {
 		if (measure) {
-			if(ds_termo(0x44)) {	// compute command
-				time1 = seconds;
+			if(dsTermo(MEASURE)) {
+				someTime = now;
 				measure = 0;
+				watchdog(WDIE, _1SEC);
+			} else errorReg(TLGR);
+		} else if ((uint8_t)(now - someTime) >= 1) {
+			measure = 1;
+			if(dsTermo(READ_SCRATCHPAD)) {
+				for (uint8_t i = 0; i < LENGTH; i++) scratchpad[i] = dsRead(TERMO_PIN);
 				
-				/* Watchdog config */
-				//WDTCR = (1 << WDCE) | (1 << WDE);	// без этой строчки не работает симуляция в proteus
-				WDTCR = (1 << WDIE) | (1 << WDP2) | (1 << WDP1); // 1 sec
-				period = 1;
-			} else {
-				ERRSUM |= (1 << LIGR);
-				DO_ERROR();	// skip iteration
-			}
-		} else if ((uint8_t)(seconds - time1) >= 1) {
-			measure = 1;		// measure in next iteration
-			if(ds_termo(0xBE)) {	// read scratchpad command
-				for (uint8_t i = 0; i < 9; i++) data[i] = ds_read(TERMO_PIN); // read termometer scratchpad into data[]
+				if (scratchpad[TEMPERATURE] == RESET_VALUE)	// maybe problem with power on termometer
+					errorReg(PORV);
+				if (dsCrc(scratchpad, FULL-1) != scratchpad[CRC_VALUE])
+					errorReg(CRCW);
+
+				pinToLow(ERROR_PIN);	// no errors in this iteration
+				ERRSUM &= ~(1 << ACTU);
 				
-				if (data[0] == 0xAA) {	// AA is termometer power-on reset value. If true, maybe problem with power on termometer
-					ERRSUM |= (1 << PORV);
-					DO_ERROR();	// skip iteration
-				}
-				if (ds_crc(data, 8) != data[8]) {	// check crc
-					ERRSUM |= (1 << CRCW);
-					DO_ERROR();	// skip iteration
-				}
-				pinToLOW(ERROR_PIN);	// no errors in this iteration
-				
+				// put the pieces of temperature value together and send it to relay regulator
+				uint16_t dTemp = (scratchpad[TEMPERATURE] | scratchpad[SIGN] << 8);	// doubled signed temperature value, directly from termometer
 				cli();
-				// calculate temperature and send it to relay regulator
-				heater.input = ((data[0] << 3 | data[1] << 11) & 0xFFF0) + 12 - data[6];
+				heater.input = ((dTemp << 3) & 0xFFF0) + 12 - scratchpad[REMAIN];	// high-precision temperatire multiplied by 16, to operate with an integer
 				sei();
 				
-				if (compute(&heater, seconds)) {
-					pinToHIGH(HEATER_PIN);
-					continue;	// skip sleep instruction. will sleep after sending compute cmd
+				if (compute(&heater, now)) {
+					pinToHigh(HEATER_PIN);
+					continue;	// skip sleep instruction while heating
 				} else {
-					pinToLOW(HEATER_PIN);
-					
-					/* Watchdog config */
-					//WDTCR = (1 << WDCE) | (1 << WDE);	// без этой строчки не работает симуляция в proteus
-					WDTCR = (1 << WDIE) | (1 << WDP3) | (1 << WDP0); // 8 sec
-					period = 8;
+					pinToLow(HEATER_PIN);
+					watchdog(WDIE, _8SEC);
 				}
-			} else {
-				ERRSUM |= (1 << LIGR);
-				DO_ERROR();	// skip iteration
-			}
+			} else errorReg(TLGR);
 		}
-		// no errors in this iteration. Go to sleep
-		/* Sleep config */
-		MCUCR = (1 << SM1) | (1 << SE); // Power-down mode
+		// Sleep config
+		MCUCR = (1 << SM1) | (1 << SE); // Power-down mode; sleep enable
 		asm ("sleep");
-		MCUCR &= ~(1 << SE);
+		MCUCR &= ~(1 << SE);			// Sleep disable, as datasheet recomends
 	} // for
 } // main
 
 ISR (WDT_vect) {
-	seconds += period;
+	now += period;
+	// Reconfigure wdt to reboot in 8 sec to handle system hang-ups, just in case
+	watchdog(WDE, _8SEC);
 }
 
 ISR (INT0_vect) {
-	// "sync" delay
-	_delay_loop_1(3);
+	GIMSK &= ~(1 << INT0);
 	
-	ds_write(ERRSUM, 1, PB0);
-	ds_write(heater.input >> 3, 1, PB0);
-	ds_write(heater.setpoint >> 3, 1, PB0);
-	heater.setpoint = (ds_read(PB0) << 3);
+	uint8_t retries = 100;
+	do {
+		if (--retries == 0) {
+			ERRSUM |= (1 << DLGR);
+			GIMSK |= (1 << INT0);
+			return;
+		}
+	} while (!readPin(DATA_PIN));
+	
+	switch (dsRead(DATA_PIN)) {
+		case 0x01:	// send all data
+			dsWrite(ERRSUM, DATA_PIN);
+			dsWrite(heater.input >> 2, DATA_PIN);
+			dsWrite(heater.setpoint >> 2, DATA_PIN);
+			dsWrite(heater.delta >> 2, DATA_PIN);
+			dsWrite(heater.k, DATA_PIN);
+		break;
+		case 0x02:	// recieve new presets
+			heater.setpoint = (dsRead(DATA_PIN) << 2);
+			heater.delta = (dsRead(DATA_PIN) << 2);
+			heater.k = dsRead(DATA_PIN);
+		break;
+		case 0x03:	// clear errsum
+			ERRSUM = 0;
+		break;
+		case 0x00:	// line grounded
+			ERRSUM |= (1 << DLGR);
+		break;
+		case 0xFF:	// no command recieved
+		break;
+		default:	// unknown command
+			dsWrite(0x01, DATA_PIN);
+	}
+	
+	GIMSK |= (1 << INT0);
 }
