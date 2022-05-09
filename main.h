@@ -13,7 +13,7 @@
 #define TLGR 0	// Termometer Line Grounded
 #define PORV 1	// Termometer Power On Reset Value
 #define CRCW 2	// Termometer CRC Wrong
-//define WDRF 3	// Watchdog Reset Flag from MCUSR
+//		WDRF 3	// Watchdog Reset Flag from MCUSR
 #define DLGR 4	// Data Line Grounded
 #define ACTU 5	// Actual error
 
@@ -49,8 +49,10 @@ volatile uint8_t now = 0;
 uint8_t period;
 
 inline void watchdog(const uint8_t mode, const uint8_t sec) {
-	if (sec == _1SEC) period = 1;
-	else if (sec == _8SEC) period = 8;
+	if (mode == WDIE) {
+		if (sec == _1SEC) period = 1;
+		else if (sec == _8SEC) period = 8;
+	} else period = 0;
 	
 	asm ("wdr");
 	WDTCR = (1 << WDCE) | (1 << WDE);
@@ -62,8 +64,8 @@ struct relay heater = {
 	.delta = MULTIPLY(1),
 	.k = 1,
 	.prevInput = 0,
-	.output = 0,
 	.prevTime = 0,
+	.output = 0,
 	.direction = 1
 };
 

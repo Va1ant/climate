@@ -38,7 +38,7 @@ int main(void) {
 				ERRSUM &= ~(1 << ACTU);
 				
 				// put the pieces of temperature value together and send it to relay regulator
-				uint16_t dTemp = (scratchpad[TEMPERATURE] | scratchpad[SIGN] << 8);	// doubled signed temperature value, directly from termometer
+				int16_t dTemp = (scratchpad[SIGN] << 8) | scratchpad[TEMPERATURE];	// doubled signed temperature value, directly from termometer
 				cli();
 				heater.input = ((dTemp << 3) & 0xFFF0) + 12 - scratchpad[REMAIN];	// high-precision temperatire multiplied by 16, to operate with an integer
 				sei();
@@ -51,11 +51,11 @@ int main(void) {
 					watchdog(WDIE, _8SEC);
 				}
 			} else errorReg(TLGR);
-		}
+		} if (!period) watchdog(WDIE, _1SEC);
 		// Sleep config
 		MCUCR = (1 << SM1) | (1 << SE); // Power-down mode; sleep enable
 		asm ("sleep");
-		MCUCR &= ~(1 << SE);		// Sleep disable, as datasheet recomends
+		MCUCR &= ~(1 << SE);			// Sleep disable, as datasheet recomends
 	} // for
 } // main
 
@@ -67,6 +67,8 @@ ISR (WDT_vect) {
 
 ISR (INT0_vect) {
 	GIMSK &= ~(1 << INT0);
+	
+//	if (period == 8) now++;
 	
 	uint8_t retries = 100;
 	do {
@@ -82,12 +84,12 @@ ISR (INT0_vect) {
 			dsWrite(ERRSUM, DATA_PIN);
 			dsWrite(heater.input >> 2, DATA_PIN);
 			dsWrite(heater.setpoint >> 2, DATA_PIN);
-			dsWrite(heater.delta >> 2, DATA_PIN);
+			dsWrite(heater.delta, DATA_PIN);
 			dsWrite(heater.k, DATA_PIN);
 		break;
 		case 0x02:	// recieve new presets
 			heater.setpoint = (dsRead(DATA_PIN) << 2);
-			heater.delta = (dsRead(DATA_PIN) << 2);
+			heater.delta = dsRead(DATA_PIN);
 			heater.k = dsRead(DATA_PIN);
 		break;
 		case 0x03:	// clear errsum
@@ -99,8 +101,7 @@ ISR (INT0_vect) {
 		case 0xFF:	// no command recieved
 		break;
 		default:	// unknown command
-			dsWrite(0x01, DATA_PIN);
+			dsWrite(0xAA, DATA_PIN);
 	}
-	
 	GIMSK |= (1 << INT0);
 }
