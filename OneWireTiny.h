@@ -23,7 +23,7 @@
 #define REMAIN		6
 #define CRC_VALUE	8
 
-_Bool dsReset(void);
+//_Bool dsReset(void);
 void dsWrite(const uint8_t byte, const uint8_t pin);
 uint8_t dsRead(const uint8_t pin);
 uint8_t dsCrc(const uint8_t *addr, uint8_t len);

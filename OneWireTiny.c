@@ -34,11 +34,11 @@ static _Bool dsReadBit(const uint8_t pin) {
 	return bit;
 }
 
-_Bool dsReset(void) {
+static _Bool dsReset(void) {
 	uint8_t retries = 100;
 	pinAsInput(TERMO_PIN);
 	while (!readPin(TERMO_PIN))
-	if (--retries == 0) return 0;
+		if (--retries == 0) return 0;
 
 	pinToLow(TERMO_PIN);
 	pinAsOutput(TERMO_PIN);
@@ -55,7 +55,7 @@ _Bool dsReset(void) {
 void dsWrite(const uint8_t byte, const uint8_t pin) {
 	cli();
 	for (uint8_t bitMask = 1; bitMask; bitMask <<= 1)
-	dsWriteBit(((bitMask & byte) ? 1 : 0), pin);
+		dsWriteBit(((bitMask & byte) ? 1 : 0), pin);
 	sei();
 	
 	// disable power

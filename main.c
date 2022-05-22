@@ -11,7 +11,7 @@ int main(void) {
 	PRR = (1 << PRTIM1) | (1 << PRTIM0) | (1 << PRUSI) | (1 << PRADC);
 	
 	// Pin config
-	DDRB = (1 << ERROR_PIN) | (1 << HEATER_PIN);
+	DDRB = (1 << ERROR_PIN) | (1 << HEATER_PIN) | (1 << TERMO_PWR);
 	
 	// Interrupt config
 	GIMSK = (1 << INT0);
@@ -21,6 +21,7 @@ int main(void) {
 		watchdog(WDIE, _1SEC);
 		if (measure) {
 			if (dsTermo(MEASURE)) {
+				pinToHigh(TERMO_PWR);
 				someTime = now;
 				measure = 0;
 			} else {
@@ -28,6 +29,7 @@ int main(void) {
 			}
 		} else if (now != someTime) {
 			measure = 1;
+			pinToLow(TERMO_PWR);
 			
 			if (!dsTermo(READ_SCRATCHPAD)) {
 				errorReg(TLGR);
@@ -67,23 +69,6 @@ int main(void) {
 		asm ("sleep");
 		MCUCR &= ~(1 << SE);			// Sleep disable, as datasheet recomends
 	}
-}
-
-static void errorReg(const uint8_t field) {
-	ERRSUM |= (1 << field) | (1 << ACTU);
-	pinToLow(HEATER_PIN);
-	pinToHigh(ERROR_PIN);
-}
-
-static void watchdog(const uint8_t mode, const uint8_t sec) {
-	if (mode == WDIE) {
-		if (sec == _1SEC) period = 1;
-		else if (sec == _8SEC) period = 8;
-	} else period = 0;
-	
-	asm ("wdr");
-	WDTCR = (1 << WDCE) | (1 << WDE);
-	WDTCR = (1 << mode) | sec;
 }
 
 ISR (WDT_vect) {
@@ -139,4 +124,21 @@ ISR (INT0_vect) {
 	}
 	
 	GIMSK |= (1 << INT0);
+}
+
+static void errorReg(const uint8_t field) {
+	ERRSUM |= (1 << field) | (1 << ACTU);
+	pinToLow(HEATER_PIN);
+	pinToHigh(ERROR_PIN);
+}
+
+static void watchdog(const uint8_t mode, const uint8_t sec) {
+	if (mode == WDIE) {
+		if (sec == _1SEC) period = 1;
+		else if (sec == _8SEC) period = 8;
+	} else period = 0;
+	
+	asm ("wdr");
+	WDTCR = (1 << WDCE) | (1 << WDE);
+	WDTCR = (1 << mode) | sec;
 }

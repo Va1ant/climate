@@ -8,9 +8,10 @@
 #define pinInvert(pin)		PORTB ^= (1 << pin)
 #define readPin(pin)		((PINB & (1 << pin)) ? 1 : 0)
 
+#define HEATER_PIN	PB0
 #define ERROR_PIN	PB1
 #define DATA_PIN	PB2
-#define HEATER_PIN	PB3
+#define TERMO_PWR	PB3
 #define TERMO_PIN	PB4
 
 #endif
