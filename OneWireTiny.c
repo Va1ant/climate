@@ -53,10 +53,11 @@ static _Bool dsReset(void) {
 }
 
 void dsWrite(const uint8_t byte, const uint8_t pin) {
+	uint8_t cSREG = SREG;
 	cli();
 	for (uint8_t bitMask = 1; bitMask; bitMask <<= 1)
 		dsWriteBit(((bitMask & byte) ? 1 : 0), pin);
-	sei();
+	SREG = cSREG;
 	
 	// disable power
 	pinAsInput(pin);
@@ -65,10 +66,11 @@ void dsWrite(const uint8_t byte, const uint8_t pin) {
 
 uint8_t dsRead(const uint8_t pin) {
 	uint8_t byte = 0;
+	uint8_t cSREG = SREG;
 	cli();
 	for (uint8_t BitMask = 0x01; BitMask; BitMask <<= 1)
 		if (dsReadBit(pin)) byte |= BitMask;
-	sei();
+	SREG = cSREG;
 	return byte;
 }
 
