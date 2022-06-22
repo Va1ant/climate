@@ -139,6 +139,9 @@ static void watchdog(const uint8_t mode, const uint8_t sec) {
 	} else period = 0;
 	
 	asm ("wdr");
+	uint8_t cSREG = SREG;
+	cli();
 	WDTCR = (1 << WDCE) | (1 << WDE);
 	WDTCR = (1 << mode) | sec;
+	SREG = cSREG;
 }
